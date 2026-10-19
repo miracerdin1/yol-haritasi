@@ -12,6 +12,7 @@ import {
   clearOfSideRoads,
   customRoad,
   loadAnchors,
+  loadPrebuilt,
   loadRoad,
 } from "./lib/roads";
 import { fitGoogleStops, planRoute } from "./lib/planner";
@@ -20,9 +21,11 @@ import { snapToRoute, touchesAvoided } from "./lib/waypoints";
 import { GOOGLE_MAX_WAYPOINTS, googleMapsUrl } from "./lib/google";
 import { yandexMapsUrl, yandexNaviUrl } from "./lib/yandex";
 import { load, save } from "./lib/storage";
+import type { FuelType, TollResult } from "./lib/cost";
+import { FUEL_DEFAULTS, FUEL_LABELS, TARIFF_DATE, tollCost } from "./lib/cost";
 
 // ---------- Ayarlar ----------
-// Derleme sırasında verilen anahtar (GitHub secret: ORS_KEY) varsa varsayılan olarak o kullanılır.
+// Derleme sırasında verilen anahtar (Netlify ortam değişkeni: VITE_ORS_KEY) varsa varsayılan olarak o kullanılır.
 const BUILT_IN_KEY =
   (import.meta.env.VITE_ORS_KEY as string | undefined)?.trim() ?? "";
 const apiKey = ref<string>(load("apiKey", "") || BUILT_IN_KEY);
@@ -112,6 +115,30 @@ const closedData = shallowRef<RoadData[]>([]);
 const stopsClean = ref(true);
 const fitting = ref(false);
 
+// ---------- Masraf ----------
+const tolls = shallowRef<TollResult | null>(null);
+const showCost = ref(false);
+const fuelType = ref<FuelType>(load("fuelType", "benzin"));
+const saved = load<Partial<typeof FUEL_DEFAULTS>>("fuel", {});
+const fuelSettings = reactive(
+  Object.fromEntries(
+    (Object.keys(FUEL_DEFAULTS) as FuelType[]).map((k) => [
+      k,
+      { ...FUEL_DEFAULTS[k], ...saved[k] },
+    ]),
+  ) as typeof FUEL_DEFAULTS,
+);
+watch(fuelType, (v) => save("fuelType", v));
+watch(fuelSettings, (v) => save("fuel", v), { deep: true });
+const fuel = computed(() => fuelSettings[fuelType.value]);
+const liters = computed(() =>
+  result.value
+    ? ((result.value.distance / 1000) * (Number(fuel.value.use) || 0)) / 100
+    : 0,
+);
+const fuelTl = computed(() => liters.value * (Number(fuel.value.price) || 0));
+const costTotal = computed(() => fuelTl.value + (tolls.value?.total ?? 0));
+
 watch(maxStops, (v) => save("maxStops", v));
 
 async function resolve(
@@ -193,6 +220,7 @@ async function calculate() {
       onStatus: (s) => (status.value = s),
     });
     result.value = res;
+    tolls.value = tollCost(res, (await loadPrebuilt())?.tolls ?? null);
     closedData.value = data;
     stops.value = [];
     await autoPick();
@@ -311,6 +339,8 @@ function dur(s: number) {
   const m = Math.round((s % 3600) / 60);
   return h ? `${h} sa ${m} dk` : `${m} dk`;
 }
+const tl = (n: number) =>
+  `${Math.round(n).toLocaleString("tr-TR")} TL`;
 const stopPoints = computed(() => stops.value.map((s) => s.point));
 const closedLabels = computed(() =>
   roads.value.filter((r) => !isAllowed(r.id)).map((r) => r.label),
@@ -495,6 +525,86 @@ const closedLabels = computed(() =>
               : "Tüm yollar açık"
           }}
         </p>
+      </div>
+      <div class="cost">
+        <button
+          type="button"
+          class="cost-head"
+          :aria-expanded="showCost"
+          aria-controls="cost-body"
+          @click="showCost = !showCost"
+        >
+          <span class="lbl">Tahmini masraf</span>
+          <span class="cost-sum">{{ tl(costTotal) }}</span>
+          <span class="chev" aria-hidden="true">▾</span>
+        </button>
+        <div v-if="showCost" id="cost-body" class="cost-body">
+          <ul class="cost-list">
+            <li>
+              <span
+                >Yakıt
+                <small
+                  >{{ FUEL_LABELS[fuelType] }} · {{ km(result.distance) }} km ·
+                  {{
+                    liters.toLocaleString("tr-TR", { maximumFractionDigits: 1 })
+                  }}
+                  L</small
+                ></span
+              ><b>{{ tl(fuelTl) }}</b>
+            </li>
+            <li v-for="(it, i) in tolls?.items ?? []" :key="i">
+              <span
+                >{{ it.label }} <small v-if="it.detail">{{ it.detail }}</small></span
+              ><b>{{ it.tl ? tl(it.tl) : "Ücretsiz" }}</b>
+            </li>
+            <li v-if="tolls && !tolls.items.length" class="none">
+              <span>Köprü ve otoyol <small>Rotada ücretli yol yok</small></span
+              ><b>0 TL</b>
+            </li>
+            <li class="total">
+              <span>Toplam</span><b>{{ tl(costTotal) }}</b>
+            </li>
+          </ul>
+          <div class="fuel">
+            <label
+              >Yakıt
+              <select v-model="fuelType">
+                <option v-for="(l, k) in FUEL_LABELS" :key="k" :value="k">
+                  {{ l }}
+                </option>
+              </select>
+            </label>
+            <label
+              >Tüketim (L/100 km)
+              <input
+                v-model.number="fuelSettings[fuelType].use"
+                type="number"
+                inputmode="decimal"
+                min="0"
+                step="0.1"
+              />
+            </label>
+            <label
+              >Litre fiyatı (TL)
+              <input
+                v-model.number="fuelSettings[fuelType].price"
+                type="number"
+                inputmode="decimal"
+                min="0"
+                step="0.01"
+              />
+            </label>
+          </div>
+          <p class="muted small">
+            Otomobil, tek yön. Köprü ve otoyol ücretleri {{ TARIFF_DATE }}
+            tarifesine göre tahmindir; otoyollar gişeden gişeye
+            ücretlendirildiği için gerçek tutar biraz farklı olabilir.
+            <template v-if="tolls?.partial">
+              Köprü/otoyol verisi yüklenemedi; paralı kısımlar devlet otoyolu
+              ücretiyle sayıldı.</template
+            >
+          </p>
+        </div>
       </div>
       <p v-if="warning" class="msg warn">{{ warning }}</p>
 

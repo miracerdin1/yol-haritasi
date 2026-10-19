@@ -1,4 +1,5 @@
 import type { BBox } from "./geo";
+import type { TollData } from "./cost";
 import type { Anchor } from "./planner";
 import { anchorsFromWays } from "./planner";
 import type { LatLng } from "./geo";
@@ -131,7 +132,7 @@ const HEADERS: Record<string, string> =
  * sırayla değil "kademeli yarış" ile gidilir: ilk sunucu `hedgeMs` içinde cevap vermezse
  * ikincisine de istek atılır, ilk geçerli cevap kazanır, diğerleri iptal edilir.
  */
-async function overpassFetch<T>(
+export async function overpassFetch<T>(
   data: string,
   {
     hedgeMs = 7000,
@@ -310,6 +311,8 @@ export interface Prebuilt {
   generatedAt: number;
   roads: Record<string, RoadData & { query: string }>;
   anchors: { box: BBox; a: Anchor[] };
+  /** Masraf hesabı için paralı otoyollar ve köprü/tüneller */
+  tolls?: TollData;
 }
 
 let prebuiltPromise: Promise<Prebuilt | null> | null = null;
