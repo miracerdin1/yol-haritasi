@@ -1,8 +1,8 @@
-// Hazır yolların (Kuzey Marmara, Avrasya, Osmangazi, 1915 Çanakkale) verisini ve Marmara
-// otoyol ağını indirip public/data/prebuilt.json dosyasını tazeler. Site bu dosyayı
+// Hazır yolların (Kuzey Marmara, Avrasya, Osmangazi, 1915 Çanakkale) verisini, Marmara
+// otoyol ağını ve masraf hesabı için Türkiye'deki paralı otoyollar ile köprü/tünelleri indirip public/data/prebuilt.json dosyasını tazeler. Site bu dosyayı
 // kullandığı için telefonda ilk hesaplama Overpass'i beklemez.
 //
-// Dosya repoda da durur: GitHub Actions'tan Overpass'e ulaşılamazsa (sunucular yoğun ya da
+// Dosya repoda da durur: Netlify derlemesinden Overpass'e ulaşılamazsa (sunucular yoğun ya da
 // bulut IP'lerini sınırlıyor) derleme repodaki son sağlam veriyle devam eder. Sadece
 // başarıyla indirilen kalemler güncellenir.
 //
@@ -15,6 +15,7 @@ import {
   processWays,
 } from "../src/lib/roads";
 import type { Prebuilt } from "../src/lib/roads";
+import { fetchTollData } from "../src/lib/cost";
 
 const FILE = "public/data/prebuilt.json";
 // Tüm hazır yollar kapalıyken oluşan bölgeyi (+20 km) rahatça kapsayan kutu
@@ -46,6 +47,7 @@ async function main() {
     generatedAt: Date.now(),
     roads: { ...(old?.roads ?? {}) },
     anchors: old?.anchors ?? { box: { s: 0, w: 0, n: 0, e: 0 }, a: [] },
+    tolls: old?.tolls,
   };
   let kept = 0;
 
@@ -77,6 +79,22 @@ async function main() {
     kept++;
     console.warn(
       `• Otoyol ağı: indirilemedi, ${out.anchors.a.length ? "repodaki veri kullanılıyor" : "site canlı indirecek"}`,
+    );
+  }
+
+  try {
+    const t = await retry("Ücretli yollar", fetchTollData);
+    const f = Object.keys(t.facilities).length;
+    if (f < 6 || !t.roads["O-7"] || !t.roads["O-5"])
+      throw new Error("beklenenden az veri");
+    out.tolls = t;
+    console.log(
+      `✓ Ücretli yollar: ${f} köprü/tünel, ${Object.keys(t.roads).join(", ")}`,
+    );
+  } catch {
+    kept++;
+    console.warn(
+      `• Ücretli yollar: indirilemedi, ${out.tolls ? "repodaki veri kullanılıyor" : "masrafta köprüler hesaplanmayacak"}`,
     );
   }
 
