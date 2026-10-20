@@ -61,33 +61,55 @@ const FACILITIES: Facility[] = [
   },
 ];
 
+interface TollRoad {
+  label: string;
+  /** Levhadaki numaralar */
+  ref: string;
+  /** TL/km */
+  perKm: number;
+  /** KGM otoyolu: kısa girişlerde gişe en az STATE_MIN alır */
+  state?: boolean;
+}
+
 /**
- * Özel işletmeli otoyollar, TL/km. Otoyollar gişeden gişeye ücretlendirilir; burada tam
- * güzergâh ücretinden (köprü hariç) km başına ortalama çıkarılıp Temmuz 2026 zammı
- * (~%17,6, köprülerdeki artışla aynı) eklendi:
+ * Paralı otoyollar (otomobil). Otoyollar gişeden gişeye ücretlendirilir; burada tam güzergâh
+ * ücretinden (köprü hariç) km başına ortalama çıkarıldı.
+ *
+ * Özel işletmeli olanlara Temmuz 2026 zammı (~%17,6, köprülerdeki artışla aynı) eklendi:
  *  O-5 Gebze–İzmir 2.465 − 995 (Osmangazi) = 1.470 TL / ~381 km
  *  O-7 Kınalı–Fatih 220 TL, Odayeri–Kurnaköy 415 TL (YSS hariç), Kurnaköy–Akyazı 510 TL
  *  O-6 Malkara–Çanakkale 1.260 − 995 (köprü) = 265 TL / ~85 km
  *  O-21 Ankara–Niğde 740 TL / ~275 km (330 km bağlantı yollarıyla) · O-31 Aydın–Denizli 495 TL / ~163 km
  *  O-33 Menemen–Çandarlı 205 TL / ~76 km
+ *
+ * KGM otoyollarında Temmuz'da zam yapılmadı (15 Temmuz/FSM 59 TL kaldı):
+ *  O-3 Mahmutbey–Edirne 168 TL / ~230 km · O-4 Kurtköy–Ankara 338 TL / ~400 km
+ *  O-21 Niğde–Tarsus 177 TL / ~190 km · O-31 İzmir–Aydın 73 TL / ~85 km
+ *  O-32 İzmir–Çeşme 53 TL / ~70 km · O-53 Ceyhan–İskenderun ~65 TL / ~105 km
+ *  O-52 Adana–Gaziantep 102 TL / ~200 km, Gaziantep–Şanlıurfa 102 TL / ~140 km
  */
-const PRIVATE_ROADS: Record<string, { label: string; perKm: number }> = {
-  "O-7": { label: "Kuzey Marmara Otoyolu", perKm: 4.2 },
-  "O-5": { label: "İstanbul–İzmir Otoyolu", perKm: 4.5 },
-  "O-6": { label: "Malkara–Çanakkale Otoyolu", perKm: 3.6 },
-  "O-21": { label: "Ankara–Niğde Otoyolu", perKm: 3.2 },
-  "O-31": { label: "Aydın–Denizli Otoyolu", perKm: 3.6 },
-  "O-33": { label: "Kuzey Ege Otoyolu", perKm: 3.2 },
+const TOLL_ROADS: Record<string, TollRoad> = {
+  "O-7": { label: "Kuzey Marmara Otoyolu", ref: "O-7 / E-80", perKm: 4.2 },
+  "O-5": { label: "İstanbul–İzmir Otoyolu", ref: "O-5 / E-881", perKm: 4.5 },
+  "O-6": { label: "Kınalı–Çanakkale Otoyolu", ref: "O-6 / E-87", perKm: 3.6 },
+  "O-21": { label: "Ankara–Niğde Otoyolu", ref: "O-21 / E-90", perKm: 3.2 },
+  "O-31": { label: "Aydın–Denizli Otoyolu", ref: "O-31 / E-87", perKm: 3.6 },
+  "O-33": { label: "Kuzey Ege Otoyolu", ref: "O-33 / E-87", perKm: 3.2 },
+  "O-3": { label: "Avrupa Otoyolu", ref: "O-3 / E-80", perKm: 0.75, state: true },
+  "O-4": { label: "Anadolu Otoyolu", ref: "O-4 / E-80", perKm: 0.85, state: true },
+  "O-21K": { label: "Niğde–Tarsus Otoyolu", ref: "O-21 / E-90", perKm: 0.95, state: true },
+  "O-31K": { label: "İzmir–Aydın Otoyolu", ref: "O-31 / E-87", perKm: 0.85, state: true },
+  "O-32": { label: "İzmir–Çeşme Otoyolu", ref: "O-32 / E-881", perKm: 0.75, state: true },
+  "O-52": { label: "Adana–Şanlıurfa Otoyolu", ref: "O-52 / E-90", perKm: 0.6, state: true },
+  "O-53": { label: "Ceyhan–İskenderun Otoyolu", ref: "O-53 / E-91", perKm: 0.6, state: true },
 };
-
-/**
- * KGM otoyolları (O-3, O-4, O-32, O-52…): Mahmutbey–Edirne 168 TL / ~230 km,
- * İstanbul–Ankara 338 TL / ~400 km. Temmuz'da zam yapılmadı (15 Temmuz/FSM 59 TL kaldı).
- * Kısa girişlerde gişe en az ~40 TL alıyor.
- */
-const STATE_ROADS = { label: "Devlet otoyolları (KGM)", perKm: 0.8, min: 40 };
+/** Numarası bilinmeyen paralı yollar: KGM ortalaması */
+const OTHER: TollRoad = { label: "Diğer paralı yollar", ref: "", perKm: 0.8, state: true };
+const STATE_MIN = 40;
 /** Bundan kısa kesintisiz KGM parçaları sayılmaz (gerçek bir gişe arası bu kadar kısa değil). */
 const STATE_MIN_RUN = 3000;
+/** Kavşaklarda özel otoyola değen kısa parçalar o otoyolu kullanmak değildir. */
+const PRIVATE_MIN_RUN = 2000;
 
 /** Boğaz köprülerine bağlanan paralı işaretli kısımlar; ücret köprüde alınır. */
 const FREE = "free";
@@ -109,7 +131,7 @@ export const FUEL_DEFAULTS: Record<FuelType, { price: number; use: number }> = {
 // ---------- Derleme sırasında hazırlanan veri ----------
 export interface TollData {
   generatedAt: number;
-  /** Özel işletmeli otoyollar (ve ücretsiz sayılan parçalar): sınıf → ~400 m aralıklı noktalar */
+  /** Paralı otoyollar (ve ücretsiz sayılan parçalar): TOLL_ROADS anahtarı → ~400 m aralıklı noktalar */
   roads: Record<string, LatLng[]>;
   /** Köprü/tünel → ~100 m aralıklı noktalar */
   facilities: Record<string, LatLng[]>;
@@ -117,7 +139,7 @@ export interface TollData {
 
 const TR_BOX = "35.8,25.6,42.2,44.9";
 
-/** Paralı bir otoyol parçasının hangi tarifeye girdiği; KGM ise null. */
+/** Paralı bir otoyol parçasının hangi tarifeye girdiği; bilinmiyorsa null. */
 function classify(tags: Record<string, string>, p: LatLng): string | null {
   const ref = (tags.ref ?? "")
     .split(";")[0]
@@ -127,16 +149,14 @@ function classify(tags: Record<string, string>, p: LatLng): string | null {
   const name = tags.name ?? "";
   const op = tags.operator ?? "";
   if (ref === "O-7" || /Kuzey Marmara/.test(name)) return "O-7";
-  if (ref === "O-5") return "O-5";
-  if (ref === "O-6") return "O-6";
   if (ref === "O-33" || /Kuzey Ege/.test(name)) return "O-33";
-  // O-21'in Niğde'nin kuzeyi (Ankara–Niğde) özel, güneyi (Niğde–Pozantı–Mersin) KGM
-  if ((ref === "O-21" && p[0] > 38.0) || /Kırşehir Bağlantısı/.test(name))
-    return "O-21";
+  if (/Kırşehir Bağlantısı/.test(name)) return "O-21";
+  // O-21'in Niğde'nin kuzeyi (Ankara–Niğde) özel, güneyi (Niğde–Pozantı–Tarsus) KGM
+  if (ref === "O-21") return p[0] > 38.0 ? "O-21" : "O-21K";
   // O-31'in Aydın'ın doğusu (Aydın–Denizli) özel, batısı (İzmir–Aydın) KGM
-  if (ref === "O-31" && (p[1] > 27.85 || /Fernas/.test(op))) return "O-31";
+  if (ref === "O-31") return p[1] > 27.85 || /Fernas/.test(op) ? "O-31" : "O-31K";
   if (ref === "O-1" || ref === "O-2") return FREE;
-  return null;
+  return ref in TOLL_ROADS ? ref : null;
 }
 
 const round = (p: LatLng): LatLng => [+p[0].toFixed(4), +p[1].toFixed(4)];
@@ -279,10 +299,8 @@ export function tollCost(route: RouteResult, data: TollData | null): TollResult 
   const classes = Object.entries(data?.roads ?? {}).map(
     ([id, s]) => [id, new PointIndex(s)] as const,
   );
-  const perClass = new Map<string, { m: number; at: number }>();
-  // KGM: kesintisiz her paralı parça ayrı bir gişe girişi sayılır (en az ücret için)
-  const stateRuns: { m: number; at: number }[] = [];
-  let lastStateAt = -Infinity;
+  // Her yolun kesintisiz parçaları; KGM'de her parça ayrı bir gişe girişi (en az ücret için)
+  const runs = new Map<string, { m: number; at: number; end: number }[]>();
   for (let i = 0; i < pts.length; i++) {
     const q = pts[i];
     if (!q.toll || used[i]) continue;
@@ -296,41 +314,34 @@ export function tollCost(route: RouteResult, data: TollData | null): TollResult 
       }
     }
     if (cls === FREE) continue;
-    if (cls) {
-      const c = perClass.get(cls) ?? { m: 0, at: q.at };
-      c.m += q.len;
-      perClass.set(cls, c);
-      continue;
-    }
-    if (q.at - lastStateAt > 1000) stateRuns.push({ m: 0, at: q.at });
-    stateRuns[stateRuns.length - 1].m += q.len;
-    lastStateAt = q.at;
+    const id = cls ?? "";
+    const list = runs.get(id) ?? [];
+    const last = list[list.length - 1];
+    // Viyadük/tünellerdeki kısa paralı işaret kopuklukları aynı yolculuk sayılır
+    if (last && q.at - last.end <= 3000) {
+      last.m += q.len;
+      last.end = q.at;
+    } else list.push({ m: q.len, at: q.at, end: q.at });
+    runs.set(id, list);
   }
 
-  for (const [id, c] of perClass) {
-    const r = PRIVATE_ROADS[id];
-    // Kavşaklarda özel otoyola değen kısa parçalar o otoyolu kullanmak değildir
-    if (!r || c.m < 2000) continue;
-    items.push({
-      label: `${r.label} (${id})`,
-      detail: kmText(c.m),
-      tl: Math.round((c.m / 1000) * r.perKm),
-      at: c.at,
-    });
-  }
-  // Köprü bağlantıları gibi kısa paralı işaretli parçalar gişe girişi değildir
-  const runs = stateRuns.filter((r) => r.m >= STATE_MIN_RUN);
-  if (runs.length) {
-    const m = runs.reduce((t, r) => t + r.m, 0);
-    const tl = runs.reduce(
-      (t, r) => t + Math.max(STATE_ROADS.min, (r.m / 1000) * STATE_ROADS.perKm),
-      0,
+  for (const [id, list] of runs) {
+    const r = TOLL_ROADS[id] ?? OTHER;
+    // Köprü bağlantıları gibi kısa paralı işaretli parçalar gişe girişi değildir
+    const ok = list.filter(
+      (x) => x.m >= (r.state ? STATE_MIN_RUN : PRIVATE_MIN_RUN),
     );
+    if (!ok.length) continue;
+    const m = ok.reduce((t, x) => t + x.m, 0);
+    const tl = ok.reduce((t, x) => {
+      const v = (x.m / 1000) * r.perKm;
+      return t + (r.state ? Math.max(STATE_MIN, v) : v);
+    }, 0);
     items.push({
-      label: STATE_ROADS.label,
+      label: r.ref ? `${r.label} (${r.ref})` : r.label,
       detail: kmText(m),
       tl: Math.round(tl),
-      at: runs[0].at,
+      at: ok[0].at,
     });
   }
 
