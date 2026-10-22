@@ -228,15 +228,20 @@ export async function fitGoogleStops(
   onStatus?: (s: string) => void,
   isClear: (pts: LatLng[]) => Promise<boolean[]> = async (pts) =>
     pts.map(() => true),
+  /** Her durumda konacak duraklar (Boğaz geçiş kilidi); sınırdan sayılır, çıkarılmaz */
+  forced: Waypoint[] = [],
 ): Promise<StopFit> {
   const samples = closed.flatMap((d) => d.samples);
   if (!samples.length) return { stops: [], clean: true };
+  const locks = forced.slice(0, maxStops);
   // Google, OpenRouteService'e göre pahalı otoyolları daha hızlı sayıyor; bu yüzden önce
   // kapalı yola paralel giden kesimi ~SEED_SPACING'de bir durakla sabitle, sonra taklitle kontrol et.
   onStatus?.("Duraklar seçiliyor…");
-  const stops: Waypoint[] = await pickClear(
-    seedStops(planned, samples, maxStops),
-    isClear,
+  const seeds = (
+    await pickClear(seedStops(planned, samples, maxStops - locks.length), isClear)
+  ).filter((s) => !locks.some((l) => Math.abs(l.along - s.along) < 3000));
+  const stops: Waypoint[] = [...locks, ...seeds].sort(
+    (a, b) => a.along - b.along,
   );
   const from = planned.line[0];
   const to = planned.line[planned.line.length - 1];
@@ -258,7 +263,7 @@ export async function fitGoogleStops(
     return pcum[bi];
   };
 
-  const fixes = new Set<Waypoint>();
+  const fixes = new Set<Waypoint>(locks);
   for (let iter = 0; iter <= maxStops + 3; iter++) {
     onStatus?.(`Google rotası kontrol ediliyor (${iter + 1})…`);
     const sim = await orsRoute(key, [from, ...stops.map((s) => s.point), to]);

@@ -94,7 +94,7 @@ input[type='text'] { width: 100%; font: inherit; color: var(--ink); background: 
 .btn.primary { background: var(--sign); color: #fff; }
 .btn.ghost { background: transparent; color: var(--ink); border-color: var(--line); }
 .btn.ghost.on { border-color: var(--sign); color: var(--sign); }
-.btn:disabled { opacity: .55; cursor: default; }
+.btn:disabled, .btn.wait { opacity: .55; cursor: default; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .actions .btn { flex: 1 1 160px; }
 

@@ -13,26 +13,27 @@ interface Facility {
   osmName: string;
   label: string;
   price: number;
-  /** Boğaz köprüleri: ücret sadece Avrupa → Asya yönünde alınır */
-  eastOnly?: boolean;
   note?: string;
 }
 
-/** Köprü ve tüneller: sabit geçiş ücreti (1 Temmuz 2026 tarifesi). */
+/**
+ * Köprü ve tüneller: sabit geçiş ücreti, iki yönde de alınır (KGM 2026 tarifeleri; 15 Temmuz ve
+ * FSM 1 Ocak, diğerleri 1 Temmuz). KGM: "01.01.2022'den itibaren FSM ve 15 Temmuz Şehitler
+ * Köprülerinden iki yönlü ücret alınmaktadır."
+ * https://www.kgm.gov.tr/Sayfalar/KGM/SiteTr/Otoyollar/UcretlerYeni.aspx
+ */
 const FACILITIES: Facility[] = [
   {
     id: "15temmuz",
     osmName: "15 Temmuz Şehitler Köprüsü",
     label: "15 Temmuz Şehitler Köprüsü",
     price: 59,
-    eastOnly: true,
   },
   {
     id: "fsm",
     osmName: "Fatih Sultan Mehmet Köprüsü",
     label: "Fatih Sultan Mehmet Köprüsü",
     price: 59,
-    eastOnly: true,
   },
   {
     id: "yss",
@@ -72,36 +73,44 @@ interface TollRoad {
 }
 
 /**
- * Paralı otoyollar (otomobil). Otoyollar gişeden gişeye ücretlendirilir; burada tam güzergâh
- * ücretinden (köprü hariç) km başına ortalama çıkarıldı.
+ * Paralı otoyollar (otomobil), TL/km. Otoyollar gişeden gişeye ücretlendirilir; burada KGM'nin
+ * 2026 tarife tablolarındaki tam parkur ücreti, aynı yolun bu uygulamanın ölçtüğü uzunluğuna
+ * (OSRM rotası + bu dosyadaki sınıflandırma) bölündü. Köprü dahil tarifelerde köprü ücreti
+ * düşüldü, köprü ayrıca sayılıyor.
+ * https://www.kgm.gov.tr/Sayfalar/KGM/SiteTr/Otoyollar/UcretlerYeni.aspx
  *
- * Özel işletmeli olanlara Temmuz 2026 zammı (~%17,6, köprülerdeki artışla aynı) eklendi:
- *  O-5 Gebze–İzmir 2.465 − 995 (Osmangazi) = 1.470 TL / ~381 km
- *  O-7 Kınalı–Fatih 220 TL, Odayeri–Kurnaköy 415 TL (YSS hariç), Kurnaköy–Akyazı 510 TL
- *  O-6 Malkara–Çanakkale 1.260 − 995 (köprü) = 265 TL / ~85 km
- *  O-21 Ankara–Niğde 740 TL / ~275 km (330 km bağlantı yollarıyla) · O-31 Aydın–Denizli 495 TL / ~163 km
- *  O-33 Menemen–Çandarlı 205 TL / ~76 km
+ * Özel işletmeli (1 Temmuz 2026):
+ *  O-7 Avrupa Kınalı–Odayeri 260 TL / 53 km · Kuzey Çevre Odayeri–Kurnaköy 520 − 110 (YSS) / 88 km
+ *  O-7 Anadolu Kurnaköy–Akyazı 600 TL / 126 km
+ *  O-5 Gebze–İzmir 1.170 (köprü) + 370 (→Bursa Kuzey) + 1.355 (Bursa Batı→İzmir) = 2.895 − 1.170 / 359 km
+ *  O-6 Malkara–Çanakkale 1.480 − 1.170 / 65 km
+ *  O-21 Ankara–Niğde 925 TL / 265 km · O-31 Aydın–Denizli 590 TL / 151 km
+ *  O-33 Menemen–Çandarlı 240 TL / 51 km
  *
- * KGM otoyollarında Temmuz'da zam yapılmadı (15 Temmuz/FSM 59 TL kaldı):
- *  O-3 Mahmutbey–Edirne 168 TL / ~230 km · O-4 Kurtköy–Ankara 338 TL / ~400 km
- *  O-21 Niğde–Tarsus 177 TL / ~190 km · O-31 İzmir–Aydın 73 TL / ~85 km
- *  O-32 İzmir–Çeşme 53 TL / ~70 km · O-53 Ceyhan–İskenderun ~65 TL / ~105 km
- *  O-52 Adana–Gaziantep 102 TL / ~200 km, Gaziantep–Şanlıurfa 102 TL / ~140 km
+ * KGM (1 Ocak 2026, Temmuz'da değişmedi):
+ *  O-3 Mahmutbey–Edirne 168 TL / 212 km · O-4 Çamlıca–Akıncı 338 TL / 380,7 km
+ *  O-21 Niğde Güney–Mersin 184 TL / 182,5 km · O-31 Işıkkent–Aydın Batı 73 TL / 88,6 km (OSM; tablo 99,6)
+ *  O-32 Seferihisar–Çeşme 53 TL / 56,3 km · O-53 Ceyhan–İskenderun 65 TL / 77 km
+ *  O-52 Adana Doğu–Gaziantep Batı 102 TL / 157 km · Gaziantep Doğu–Şanlıurfa 102 TL / 120 km
+ * Hesap özeti: docs/tarifeler/README.md
  */
 const TOLL_ROADS: Record<string, TollRoad> = {
-  "O-7": { label: "Kuzey Marmara Otoyolu", ref: "O-7 / E-80", perKm: 4.2 },
-  "O-5": { label: "İstanbul–İzmir Otoyolu", ref: "O-5 / E-881", perKm: 4.5 },
-  "O-6": { label: "Kınalı–Çanakkale Otoyolu", ref: "O-6 / E-87", perKm: 3.6 },
-  "O-21": { label: "Ankara–Niğde Otoyolu", ref: "O-21 / E-90", perKm: 3.2 },
-  "O-31": { label: "Aydın–Denizli Otoyolu", ref: "O-31 / E-87", perKm: 3.6 },
-  "O-33": { label: "Kuzey Ege Otoyolu", ref: "O-33 / E-87", perKm: 3.2 },
-  "O-3": { label: "Avrupa Otoyolu", ref: "O-3 / E-80", perKm: 0.75, state: true },
-  "O-4": { label: "Anadolu Otoyolu", ref: "O-4 / E-80", perKm: 0.85, state: true },
-  "O-21K": { label: "Niğde–Tarsus Otoyolu", ref: "O-21 / E-90", perKm: 0.95, state: true },
-  "O-31K": { label: "İzmir–Aydın Otoyolu", ref: "O-31 / E-87", perKm: 0.85, state: true },
-  "O-32": { label: "İzmir–Çeşme Otoyolu", ref: "O-32 / E-881", perKm: 0.75, state: true },
-  "O-52": { label: "Adana–Şanlıurfa Otoyolu", ref: "O-52 / E-90", perKm: 0.6, state: true },
-  "O-53": { label: "Ceyhan–İskenderun Otoyolu", ref: "O-53 / E-91", perKm: 0.6, state: true },
+  "O-7A": { label: "Kuzey Marmara Otoyolu, Avrupa", ref: "O-7 / E-80", perKm: 4.9 },
+  "O-7K": { label: "Kuzey Çevre Otoyolu", ref: "O-7 / E-80", perKm: 4.7 },
+  "O-7D": { label: "Kuzey Marmara Otoyolu, Anadolu", ref: "O-7 / E-80", perKm: 4.8 },
+  "O-5": { label: "İstanbul–İzmir Otoyolu", ref: "O-5 / E-881", perKm: 4.8 },
+  "O-6": { label: "Malkara–Çanakkale Otoyolu", ref: "O-6 / E-87", perKm: 4.8 },
+  "O-21": { label: "Ankara–Niğde Otoyolu", ref: "O-21 / E-90", perKm: 3.5 },
+  "O-31": { label: "Aydın–Denizli Otoyolu", ref: "O-31 / E-87", perKm: 3.9 },
+  "O-33": { label: "Kuzey Ege Otoyolu", ref: "O-33 / E-87", perKm: 4.7 },
+  "O-3": { label: "Avrupa Otoyolu", ref: "O-3 / E-80", perKm: 0.79, state: true },
+  "O-4": { label: "Anadolu Otoyolu", ref: "O-4 / E-80", perKm: 0.89, state: true },
+  "O-21K": { label: "Niğde–Mersin Otoyolu", ref: "O-21 / E-90", perKm: 1.0, state: true },
+  "O-31K": { label: "İzmir–Aydın Otoyolu", ref: "O-31 / E-87", perKm: 0.82, state: true },
+  "O-32": { label: "İzmir–Çeşme Otoyolu", ref: "O-32 / E-881", perKm: 0.94, state: true },
+  "O-52": { label: "Adana–Gaziantep Otoyolu", ref: "O-52 / E-90", perKm: 0.65, state: true },
+  "O-52Ş": { label: "Gaziantep–Şanlıurfa Otoyolu", ref: "O-52 / E-90", perKm: 0.85, state: true },
+  "O-53": { label: "Ceyhan–İskenderun Otoyolu", ref: "O-53 / E-91", perKm: 0.84, state: true },
 };
 /** Numarası bilinmeyen paralı yollar: KGM ortalaması */
 const OTHER: TollRoad = { label: "Diğer paralı yollar", ref: "", perKm: 0.8, state: true };
@@ -148,13 +157,22 @@ function classify(tags: Record<string, string>, p: LatLng): string | null {
     .replace(/^O(\d)/, "O-$1");
   const name = tags.name ?? "";
   const op = tags.operator ?? "";
-  if (ref === "O-7" || /Kuzey Marmara/.test(name)) return "O-7";
+  if (ref === "O-7" || /Kuzey Marmara/.test(name)) {
+    // Üç ayrı tarife: Avrupa (Kınalı–Odayeri), Kuzey Çevre (Odayeri–YSS–Kurnaköy, Çamlık ve
+    // Fenertepe bağlantıları dahil), Anadolu (Kurnaköy/İstanbulpark–Akyazı)
+    if (p[1] < 28.78) return "O-7A";
+    return p[0] < 40.96 ? "O-7D" : "O-7K";
+  }
   if (ref === "O-33" || /Kuzey Ege/.test(name)) return "O-33";
   if (/Kırşehir Bağlantısı/.test(name)) return "O-21";
   // O-21'in Niğde'nin kuzeyi (Ankara–Niğde) özel, güneyi (Niğde–Pozantı–Tarsus) KGM
   if (ref === "O-21") return p[0] > 38.0 ? "O-21" : "O-21K";
   // O-31'in Aydın'ın doğusu (Aydın–Denizli) özel, batısı (İzmir–Aydın) KGM
   if (ref === "O-31") return p[1] > 27.85 || /Fernas/.test(op) ? "O-31" : "O-31K";
+  // O-6'nın Malkara'nın doğusu (Kınalı–Malkara) 1915 tarifesinde yok
+  if (ref === "O-6" && p[1] > 27.0) return null;
+  // O-52 Gaziantep'in doğusu ayrı tarife (Gaziantep Doğu–Şanlıurfa)
+  if (ref === "O-52" && p[1] > 37.4) return "O-52Ş";
   if (ref === "O-1" || ref === "O-2") return FREE;
   return ref in TOLL_ROADS ? ref : null;
 }
@@ -225,19 +243,21 @@ const STEP = 50;
 const kmText = (m: number) =>
   `${(m / 1000).toLocaleString("tr-TR", { maximumFractionDigits: m < 10000 ? 1 : 0 })} km`;
 
-/**
- * Rotanın köprü/tünel ve otoyol ücretlerini tahmin eder. Rota ~50 m'lik parçalara bölünür:
- * önce köprü/tünellerin üstünden geçen kısımlar sabit ücretle sayılır, kalan paralı kısımlar
- * yakın olduğu özel otoyolun km ücretiyle, hiçbirine yakın değilse KGM tarifesiyle.
- */
-export function tollCost(route: RouteResult, data: TollData | null): TollResult {
+interface DensePoint {
+  p: LatLng;
+  len: number;
+  /** Rota başından metre */
+  at: number;
+  toll: boolean;
+}
+
+/** Rotayı ~50 m'lik parçalara böler; her parça kendi uzunluğunu ve "paralı mı" bilgisini taşır. */
+function densify(route: RouteResult): DensePoint[] {
   const { line } = route;
   const cat = new Uint8Array(Math.max(0, line.length - 1));
   for (const [a, b, v] of route.waycategory)
     for (let i = a; i < b && i < cat.length; i++) cat[i] = v;
-
-  // ~50 m aralıklı noktalar; her biri kendi uzunluğunu ve "paralı mı" bilgisini taşır
-  const pts: { p: LatLng; len: number; at: number; toll: boolean }[] = [];
+  const pts: DensePoint[] = [];
   let at = 0;
   for (let i = 0; i < line.length - 1; i++) {
     const d = haversine(line[i], line[i + 1]);
@@ -256,10 +276,19 @@ export function tollCost(route: RouteResult, data: TollData | null): TollResult 
     }
     at += d;
   }
+  return pts;
+}
 
-  const items: CostItem[] = [];
-  const used = new Uint8Array(pts.length);
+interface Crossing {
+  facility: Facility;
+  /** Köprünün üstündeki ilk ve son nokta (densify indeksleri) */
+  from: number;
+  to: number;
+}
 
+/** Rotanın üstünden geçtiği köprü/tüneller, rota sırasıyla. */
+function findCrossings(pts: DensePoint[], data: TollData | null): Crossing[] {
+  const out: Crossing[] = [];
   for (const f of FACILITIES) {
     const samples = data?.facilities[f.id];
     if (!samples?.length) continue;
@@ -270,19 +299,8 @@ export function tollCost(route: RouteResult, data: TollData | null): TollResult 
     let last = -1;
     let covered = 0;
     const flush = () => {
-      if (start >= 0 && covered >= 0.6 * span) {
-        for (let i = start; i <= last; i++) used[i] = 1;
-        const east = pts[last].p[1] > pts[start].p[1];
-        const free = f.eastOnly && !east;
-        items.push({
-          label: f.label,
-          detail: free
-            ? "Asya → Avrupa yönü ücretsiz"
-            : (f.note ?? (f.eastOnly ? "Avrupa → Asya" : "")),
-          tl: free ? 0 : f.price,
-          at: pts[start].at,
-        });
-      }
+      if (start >= 0 && covered >= 0.6 * span)
+        out.push({ facility: f, from: start, to: last });
       start = -1;
       covered = 0;
     };
@@ -294,6 +312,66 @@ export function tollCost(route: RouteResult, data: TollData | null): TollResult 
       } else if (start >= 0 && i - last > 4) flush();
     }
     flush();
+  }
+  return out.sort((a, b) => a.from - b.from);
+}
+
+/** Boğaz geçişleri: biri kapalıyken Google trafiğe göre diğerine kayabiliyor. */
+const BOSPHORUS = ["15temmuz", "fsm", "yss", "avrasya"];
+/** Hazır yol → içerdiği köprü/tünel */
+const ROAD_FACILITY: Record<string, string> = {
+  kmo: "yss",
+  avrasya: "avrasya",
+  osmangazi: "osmangazi",
+  canakkale: "canakkale",
+};
+
+export interface CrossingLock {
+  point: LatLng;
+  along: number;
+  label: string;
+}
+
+/**
+ * Rota Boğaz'ı açık bir köprü/tünelden geçiyor ve başka bir Boğaz geçişi kapalıysa, geçilen
+ * köprünün ortasına konacak durak. ORS trafiği bilmediği için taklit "durak gerekmiyor"
+ * diyebiliyor; Google ise trafikte (ör. FSM yoğunken) kapalı köprüyü seçebiliyor. Köprü
+ * suyun üstünde olduğundan Google durağı başka bir yola oturtamaz.
+ */
+export function crossingLocks(
+  route: RouteResult,
+  data: TollData | null,
+  closedRoadIds: string[],
+): CrossingLock[] {
+  const closed = new Set(closedRoadIds.map((id) => ROAD_FACILITY[id]));
+  if (!data || !BOSPHORUS.some((f) => closed.has(f))) return [];
+  const pts = densify(route);
+  return findCrossings(pts, data)
+    .filter((c) => BOSPHORUS.includes(c.facility.id) && !closed.has(c.facility.id))
+    .map((c) => {
+      const k = Math.round((c.from + c.to) / 2);
+      return { point: pts[k].p, along: pts[k].at, label: c.facility.label };
+    });
+}
+
+/**
+ * Rotanın köprü/tünel ve otoyol ücretlerini tahmin eder. Rota ~50 m'lik parçalara bölünür:
+ * önce köprü/tünellerin üstünden geçen kısımlar sabit ücretle sayılır, kalan paralı kısımlar
+ * yakın olduğu otoyolun km ücretiyle, hiçbirine yakın değilse KGM ortalamasıyla.
+ */
+export function tollCost(route: RouteResult, data: TollData | null): TollResult {
+  const pts = densify(route);
+  const items: CostItem[] = [];
+  const used = new Uint8Array(pts.length);
+
+  for (const { facility: f, from, to } of findCrossings(pts, data)) {
+    for (let i = from; i <= to; i++) used[i] = 1;
+    items.push({
+      label: f.label,
+      detail: f.note ?? "",
+      tl: f.price,
+      at: pts[from].at,
+    });
   }
 
   const classes = Object.entries(data?.roads ?? {}).map(
