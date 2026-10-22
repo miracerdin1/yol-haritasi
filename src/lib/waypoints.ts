@@ -8,6 +8,8 @@ export interface Waypoint {
   /** Kaçınılan en yakın yola uzaklık (m); elle eklenenlerde Infinity */
   nearAvoided: number
   manual?: boolean
+  /** Zorunlu geçiş durağı (ör. Boğaz'da kullanılan köprü) */
+  lock?: string
 }
 
 const HIGHWAY = 1

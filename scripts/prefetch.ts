@@ -1,14 +1,20 @@
 // Hazır yolların (Kuzey Marmara, Avrasya, Osmangazi, 1915 Çanakkale) verisini, Marmara
-// otoyol ağını ve masraf hesabı için Türkiye'deki paralı otoyollar ile köprü/tünelleri indirip public/data/prebuilt.json dosyasını tazeler. Site bu dosyayı
+// otoyol ağını ve masraf hesabı için Türkiye'deki paralı otoyollar ile köprü/tünelleri indirip
+// public/data/prebuilt.json dosyasını tazeler. Site bu dosyayı
 // kullandığı için telefonda ilk hesaplama Overpass'i beklemez.
 //
 // Dosya repoda da durur: Netlify derlemesinden Overpass'e ulaşılamazsa (sunucular yoğun ya da
 // bulut IP'lerini sınırlıyor) derleme repodaki son sağlam veriyle devam eder. Sadece
 // başarıyla indirilen kalemler güncellenir.
 //
+// Netlify derlemesi 18 dakikada kesiliyor. Overpass'e hiç ulaşılamıyorsa (ECONNREFUSED) baştan
+// vazgeçilir; ulaşılıyor ama yavaşsa toplam süre BUDGET_MS ile sınırlıdır, kalan kalemler
+// repodaki veriyle kalır.
+//
 // Çalıştırma: npm run prefetch
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import {
+  ENDPOINTS,
   PRESET_ROADS,
   fetchAnchors,
   overpass,
@@ -21,25 +27,58 @@ const FILE = "public/data/prebuilt.json";
 // Tüm hazır yollar kapalıyken oluşan bölgeyi (+20 km) rahatça kapsayan kutu
 const ANCHOR_BOX = { s: 39.9, w: 26.0, n: 41.7, e: 31.3 };
 
+/** Ön hazırlığın toplam süresi (denemek için PREFETCH_BUDGET_MS ile kısaltılabilir). */
+const BUDGET_MS = Number(process.env.PREFETCH_BUDGET_MS) || 6 * 60_000;
+const deadline = Date.now() + BUDGET_MS;
+const timeLeft = () => deadline - Date.now();
+
+/** En az bir Overpass sunucusu cevap veriyor mu? "Meşgul" cevabı da ulaşılabilir sayılır. */
+async function reachable(): Promise<boolean> {
+  return Promise.any(
+    ENDPOINTS.map(async (ep) => {
+      await fetch(ep.replace(/interpreter$/, "status"), {
+        signal: AbortSignal.timeout(10_000),
+      });
+      return true;
+    }),
+  ).catch(() => false);
+}
+
+/** `fn`'i en fazla kalan süre kadar bekler. */
+function withinBudget<T>(p: Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error("süre doldu")), timeLeft());
+    p.then(resolve, reject).finally(() => clearTimeout(t));
+  });
+}
+
 async function retry<T>(
   label: string,
   fn: () => Promise<T>,
   tries = 3,
 ): Promise<T> {
-  let last: unknown;
-  for (let i = 1; i <= tries; i++) {
+  let last: unknown = new Error("süre doldu");
+  for (let i = 1; i <= tries && timeLeft() > 0; i++) {
     try {
-      return await fn();
+      return await withinBudget(fn());
     } catch (err) {
       last = err;
       console.warn(`  ${label}: deneme ${i}/${tries} başarısız`);
-      if (i < tries) await new Promise((r) => setTimeout(r, 15000 * i));
+      const wait = 15000 * i;
+      if (i < tries && timeLeft() > wait)
+        await new Promise((r) => setTimeout(r, wait));
     }
   }
   throw last;
 }
 
 async function main() {
+  if (!(await reachable())) {
+    console.log(
+      "::notice::Overpass sunucularına ulaşılamadı; repodaki yol verisi değiştirilmeden kullanılıyor.",
+    );
+    return;
+  }
   const old: Prebuilt | null = existsSync(FILE)
     ? JSON.parse(readFileSync(FILE, "utf8"))
     : null;
@@ -85,7 +124,7 @@ async function main() {
   try {
     const t = await retry("Ücretli yollar", fetchTollData);
     const f = Object.keys(t.facilities).length;
-    if (f < 6 || !t.roads["O-7"] || !t.roads["O-5"])
+    if (f < 6 || !t.roads["O-7D"] || !t.roads["O-5"])
       throw new Error("beklenenden az veri");
     out.tolls = t;
     console.log(
@@ -107,7 +146,10 @@ async function main() {
     );
 }
 
-// Overpass'e ulaşılamasa bile derleme durmasın.
-main().catch((err) => {
-  console.warn("Ön hazırlık başarısız, repodaki veri kullanılacak:", err);
-});
+// Overpass'e ulaşılamasa bile derleme durmasın. Yarım kalan istekler süreci açık tutmasın diye
+// iş bitince çıkılır.
+main()
+  .catch((err) => {
+    console.warn("Ön hazırlık başarısız, repodaki veri kullanılacak:", err);
+  })
+  .finally(() => process.exit(0));

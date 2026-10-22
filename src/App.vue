@@ -22,7 +22,13 @@ import { GOOGLE_MAX_WAYPOINTS, googleMapsUrl } from "./lib/google";
 import { yandexMapsUrl, yandexNaviUrl } from "./lib/yandex";
 import { load, save } from "./lib/storage";
 import type { FuelType, TollResult } from "./lib/cost";
-import { FUEL_DEFAULTS, FUEL_LABELS, TARIFF_DATE, tollCost } from "./lib/cost";
+import {
+  FUEL_DEFAULTS,
+  FUEL_LABELS,
+  TARIFF_DATE,
+  crossingLocks,
+  tollCost,
+} from "./lib/cost";
 
 // ---------- Ayarlar ----------
 // Derleme sırasında verilen anahtar (Netlify ortam değişkeni: VITE_ORS_KEY) varsa varsayılan olarak o kullanılır.
@@ -266,6 +272,16 @@ async function autoPick() {
   fitting.value = true;
   error.value = "";
   try {
+    const locks: Waypoint[] = crossingLocks(
+      result.value,
+      (await loadPrebuilt())?.tolls ?? null,
+      closedData.value.map((d) => d.id),
+    ).map((c) => ({
+      point: c.point,
+      along: c.along,
+      nearAvoided: Infinity,
+      lock: c.label,
+    }));
     const fit = await fitGoogleStops(
       apiKey.value,
       result.value,
@@ -273,6 +289,7 @@ async function autoPick() {
       maxStops.value,
       (s) => (status.value = s),
       clearOfSideRoads,
+      locks,
     );
     stops.value = fit.stops;
     stopsClean.value = fit.clean;
@@ -637,7 +654,9 @@ const closedLabels = computed(() =>
               >{{
                 s.manual
                   ? "Elle eklendi"
-                  : `Kapalı yola ${km(s.nearAvoided)} km`
+                  : s.lock
+                    ? `${s.lock}: geçiş sabit`
+                    : `Kapalı yola ${km(s.nearAvoided)} km`
               }}
               · {{ s.point[0].toFixed(5) }}, {{ s.point[1].toFixed(5) }}</small
             >
@@ -651,15 +670,18 @@ const closedLabels = computed(() =>
             ✕
           </button>
         </li>
-        <li v-if="!stops.length" class="empty">
+        <li v-if="fitting" class="empty">
+          {{ status || "Duraklar seçiliyor…" }}
+        </li>
+        <li v-else-if="!stops.length" class="empty">
           Durak gerekmiyor: Google'ın en hızlı rotası kapalı yolları zaten
           kullanmıyor.
         </li>
       </ol>
-      <p v-if="stopsClean && stops.length" class="msg ok">
+      <p v-if="!fitting && stopsClean && stops.length" class="msg ok">
         ✓ Bu duraklarla Google'ın en hızlı rotası kapalı yollara girmiyor.
       </p>
-      <p v-else-if="!stopsClean" class="msg warn">
+      <p v-else-if="!fitting && !stopsClean" class="msg warn">
         {{ maxStops }} durakla yetmedi. Sayıyı artırıp "Otomatik seç"e basın ya
         da haritadan elle durak ekleyin.
       </p>
@@ -683,16 +705,42 @@ const closedLabels = computed(() =>
         </button>
       </div>
       <div class="actions">
-        <a class="btn primary" :href="gmapsUrl" target="_blank" rel="noopener"
-          >Google Maps'te aç ↗</a
+        <a
+          class="btn primary"
+          :class="{ wait: fitting }"
+          :href="gmapsUrl"
+          target="_blank"
+          rel="noopener"
+          :aria-disabled="fitting"
+          @click="fitting && $event.preventDefault()"
+          >{{ fitting ? "Duraklar hazırlanıyor…" : "Google Maps'te aç ↗" }}</a
         >
-        <button type="button" class="btn ghost" @click="copyLink">
+        <button
+          type="button"
+          class="btn ghost"
+          :disabled="fitting"
+          @click="copyLink"
+        >
           {{ copied ? "Kopyalandı" : "Linki kopyala" }}
         </button>
       </div>
       <div class="actions">
-        <a class="btn primary" :href="ynaviUrl">Yandex Navigasyon'da aç ↗</a>
-        <a class="btn ghost" :href="ymapsUrl" target="_blank" rel="noopener"
+        <a
+          class="btn primary"
+          :class="{ wait: fitting }"
+          :href="ynaviUrl"
+          :aria-disabled="fitting"
+          @click="fitting && $event.preventDefault()"
+          >Yandex Navigasyon'da aç ↗</a
+        >
+        <a
+          class="btn ghost"
+          :class="{ wait: fitting }"
+          :href="ymapsUrl"
+          target="_blank"
+          rel="noopener"
+          :aria-disabled="fitting"
+          @click="fitting && $event.preventDefault()"
           >Yandex Haritalar ↗</a
         >
       </div>
