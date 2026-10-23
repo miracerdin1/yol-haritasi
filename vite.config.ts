@@ -36,7 +36,7 @@ export default defineConfig({
           },
           {
             // Yol ve ücret verisi haftalık tazeleniyor: önce ağ, çevrimdışıyken son kopya
-            urlPattern: ({ url }) => url.pathname.endsWith('/data/prebuilt.json'),
+            urlPattern: ({ url }) => /\/data\/(prebuilt|radars)\.json$/.test(url.pathname),
             handler: 'NetworkFirst',
             options: { cacheName: 'data', networkTimeoutSeconds: 8 },
           },
