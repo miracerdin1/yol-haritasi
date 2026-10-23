@@ -21,6 +21,8 @@ import { snapToRoute, touchesAvoided } from "./lib/waypoints";
 import { GOOGLE_MAX_WAYPOINTS, googleMapsUrl } from "./lib/google";
 import { yandexMapsUrl, yandexNaviUrl } from "./lib/yandex";
 import { load, save } from "./lib/storage";
+import { fetchRadars } from "./lib/radars";
+import type { Radar, Section } from "./lib/radars";
 import type { FuelType, TollResult } from "./lib/cost";
 import {
   FUEL_DEFAULTS,
@@ -117,6 +119,9 @@ const maxStops = ref<number>(
 const addMode = ref(false);
 const copied = ref(false);
 const closedData = shallowRef<RoadData[]>([]);
+const radars = shallowRef<Radar[]>([]);
+const sections = shallowRef<Section[]>([]);
+const radarState = ref<"" | "loading" | "failed">("");
 /** Durak ayarı sonrası Google'ın taklit rotası kapalı yolları kullanıyor mu */
 const stopsClean = ref(true);
 const fitting = ref(false);
@@ -174,6 +179,22 @@ async function resolve(
   return res[0];
 }
 
+/** Rota üzerindeki radarlar arka planda gelir; rota sonucunu bekletmez. */
+async function loadRadars(line: LatLng[]) {
+  radarState.value = "loading";
+  radars.value = [];
+  sections.value = [];
+  try {
+    const r = await fetchRadars(line);
+    if (result.value?.line !== line) return;
+    radars.value = r.radars;
+    sections.value = r.sections;
+    radarState.value = "";
+  } catch {
+    if (result.value?.line === line) radarState.value = "failed";
+  }
+}
+
 async function calculate() {
   error.value = "";
   warning.value = "";
@@ -226,6 +247,7 @@ async function calculate() {
       onStatus: (s) => (status.value = s),
     });
     result.value = res;
+    loadRadars(res.line);
     tolls.value = tollCost(res, (await loadPrebuilt())?.tolls ?? null);
     closedData.value = data;
     stops.value = [];
@@ -516,6 +538,8 @@ const closedLabels = computed(() =>
       <MapView
         :route="result?.line ?? null"
         :avoided="avoidedLines"
+        :radars="radars"
+        :sections="sections"
         :stops="stopPoints"
         :from="resolvedFrom"
         :to="resolvedTo"
@@ -526,6 +550,23 @@ const closedLabels = computed(() =>
       <p class="legend">
         <i class="lg route"></i>Önerilen rota <i class="lg avoid"></i>Kapalı
         yollar <i class="lg pin"></i>Durak (dokun: kaldır)
+        <i class="lg radar"></i>Sabit radar
+        <i class="lg section"></i>Ortalama hız bölümü
+      </p>
+      <p v-if="radarState === 'loading'" class="legend">Radarlar aranıyor…</p>
+      <p v-else-if="radarState === 'failed'" class="legend">
+        Radar verisi alınamadı.
+        <button
+          type="button"
+          class="link"
+          @click="result && loadRadars(result.line)"
+        >
+          Tekrar ara
+        </button>
+      </p>
+      <p v-else-if="result" class="legend">
+        Rotada {{ radars.length }} sabit radar, {{ sections.length }} ortalama
+        hız bölümü işaretli (OpenStreetMap; eksik olabilir).
       </p>
     </section>
 

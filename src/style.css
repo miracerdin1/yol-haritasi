@@ -107,6 +107,8 @@ input[type='text'] { width: 100%; font: inherit; color: var(--ink); background: 
 .lg { display: inline-block; width: 18px; height: 5px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
 .lg.route { background: var(--sign); }
 .lg.avoid { background: repeating-linear-gradient(90deg, var(--stop) 0 5px, transparent 5px 9px); }
+.lg.radar { width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 3px solid #d62828; box-sizing: border-box; }
+.lg.section { background: #f77f00; }
 .lg.pin { width: 12px; height: 12px; border-radius: 50%; background: var(--sign); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line); }
 
 .out { padding: 14px; }
@@ -146,3 +148,4 @@ footer { text-align: center; }
 .fuel label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
 .fuel input, .fuel select { width: 100%; min-width: 0; font: inherit; font-size: 16px; color: var(--ink); background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; padding: 9px 10px; }
 @media (max-width: 420px) { .fuel { grid-template-columns: 1fr 1fr; } .fuel label:first-child { grid-column: 1 / -1; } }
+button.link { background: none; border: 0; padding: 0 0 0 6px; color: var(--sign); font: inherit; text-decoration: underline; cursor: pointer; }
