@@ -85,6 +85,24 @@ input[type='text'] { width: 100%; font: inherit; color: var(--ink); background: 
 .tog input:checked ~ .sw { background: var(--sign); }
 .tog input:checked ~ .sw::after { transform: translateX(20px); }
 .tog input:focus-visible ~ .sw { outline: 3px solid var(--focus); outline-offset: 2px; }
+.pick { overflow: hidden; }
+.pick-head { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 14px 12px; border: 0; background: var(--surface); color: var(--ink); font: 600 16px var(--body); text-align: left; cursor: pointer; }
+.pick-head:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
+.pick-head[aria-expanded='true'] .chev { transform: rotate(180deg); }
+.chips { list-style: none; margin: 0; padding: 0 12px 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 6px; border: 1.5px solid var(--line); border-radius: 999px; font-size: 14px; background: var(--bg); }
+.chip .tag { min-width: 0; font-size: 11px; }
+.chip .x { width: 26px; height: 26px; font-size: 13px; }
+.pick-body { border-top: 1px solid var(--line); }
+.pick-search { display: block; width: calc(100% - 24px); margin: 10px 12px; padding: 10px; box-sizing: border-box; }
+.pick-list { max-height: 320px; overflow-y: auto; border-top: 1px solid var(--line); }
+.opt { display: grid; grid-template-columns: auto auto 1fr auto; gap: 10px; align-items: center; padding: 12px; cursor: pointer; }
+.opt + .opt { border-top: 1px solid var(--line); }
+.opt input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--stop); }
+.opt .txt { display: flex; flex-direction: column; min-width: 0; }
+.opt small { color: var(--muted); }
+.pick .add { border-top: 1px solid var(--line); }
+.pad { padding: 12px; margin: 0; }
 .x { width: 32px; height: 32px; border: 0; background: none; color: var(--muted); font-size: 16px; cursor: pointer; border-radius: 50%; }
 .add { display: flex; gap: 8px; padding: 10px 12px; }
 .add input { flex: 1; min-width: 0; padding: 9px 10px; }
