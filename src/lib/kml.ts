@@ -1,4 +1,5 @@
 import type { LatLng } from './geo'
+import { radarStretches } from './radars'
 import type { Radar, Section } from './radars'
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -27,6 +28,7 @@ export function routeKml(route: LatLng[], radars: Radar[], sections: Section[], 
   const parts = [
     style('rota', 'ffb36b0b', 5),
     style('bolum', 'ff009ff7', 8),
+    style('radarli', 'ffbf2c7b', 6),
     pin('radar', 'ff2828d6'),
     pin('durak', 'ffb36b0b'),
     line('Rota', route, 'rota'),
@@ -34,6 +36,7 @@ export function routeKml(route: LatLng[], radars: Radar[], sections: Section[], 
       const km = (s.length / 1000).toFixed(1).replace('.', ',')
       return line(`Ortalama hız bölümü · ${km} km${s.maxspeed ? ` · ${s.maxspeed} km/s` : ''}`, s.line, 'bolum')
     }),
+    ...radarStretches(route, radars).map((l) => line('Radarlı yol', l, 'radarli')),
     ...radars.map((r) =>
       point(KIND[r.kind] + (r.maxspeed ? ` · ${r.maxspeed} km/s` : ''), r.p, 'radar'),
     ),
@@ -42,8 +45,22 @@ export function routeKml(route: LatLng[], radars: Radar[], sections: Section[], 
   return `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Rota ve radarlar</name>${parts.join('')}</Document></kml>`
 }
 
-export function downloadKml(kml: string, filename = 'rota-radarlar.kml'): void {
-  const url = URL.createObjectURL(new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' }))
+/**
+ * Telefonlarda (özellikle iPhone) `download` bağlantısı dosyayı kaydetmez; paylaşım menüsü
+ * ("Dosyalara Kaydet", Haritalar...) açılır. Desteklenmiyorsa klasik indirmeye düşer.
+ */
+export async function downloadKml(kml: string, filename = 'rota-radarlar.kml'): Promise<void> {
+  const type = 'application/vnd.google-earth.kml+xml'
+  try {
+    const file = new File([kml], filename, { type })
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'Rota ve radarlar' })
+      return
+    }
+  } catch (err) {
+    if ((err as Error)?.name === 'AbortError') return
+  }
+  const url = URL.createObjectURL(new Blob([kml], { type }))
   const a = document.createElement('a')
   a.href = url
   a.download = filename

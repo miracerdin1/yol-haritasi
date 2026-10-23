@@ -559,6 +559,7 @@ const closedLabels = computed(() =>
         <i class="lg route"></i>Önerilen rota <i class="lg avoid"></i>Kapalı
         yollar <i class="lg pin"></i>Durak (dokun: kaldır)
         <i class="lg radar"></i>Sabit radar
+        <i class="lg radar-road"></i>Radarlı yol
         <i class="lg section"></i>Ortalama hız bölümü
       </p>
       <p v-if="radarState === 'loading'" class="legend">Radarlar aranıyor…</p>

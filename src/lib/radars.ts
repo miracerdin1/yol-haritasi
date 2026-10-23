@@ -151,3 +151,34 @@ function sectionOf(members: Member[], maxspeed?: number): Section | null {
   const cum = cumulative(pts)
   return { line: pts, maxspeed, length: cum[cum.length - 1] }
 }
+
+/** Radarın önünde ve arkasında rotanın bu kadarı (metre) "radarlı yol" sayılır. */
+const REACH_M = 300
+const STEP_M = 40
+
+/** Rotanın radarlı kesimleri; üst üste binenler birleştirilir. */
+export function radarStretches(route: LatLng[], radars: Radar[]): LatLng[][] {
+  if (route.length < 2 || !radars.length) return []
+  const pts = resample(route, STEP_M)
+  const reach = Math.ceil(REACH_M / STEP_M)
+  const spans: [number, number][] = radars.map((r) => {
+    let best = 0
+    let bd = Infinity
+    for (let i = 0; i < pts.length; i++) {
+      const d = Math.hypot(pts[i][0] - r.p[0], pts[i][1] - r.p[1])
+      if (d < bd) {
+        bd = d
+        best = i
+      }
+    }
+    return [Math.max(0, best - reach), Math.min(pts.length - 1, best + reach)]
+  })
+  spans.sort((a, b) => a[0] - b[0])
+  const merged: [number, number][] = []
+  for (const s of spans) {
+    const last = merged[merged.length - 1]
+    if (last && s[0] <= last[1]) last[1] = Math.max(last[1], s[1])
+    else merged.push([s[0], s[1]])
+  }
+  return merged.map(([a, b]) => pts.slice(a, b + 1))
+}
