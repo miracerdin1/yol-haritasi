@@ -3,6 +3,7 @@ import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { LatLng } from '../lib/geo'
+import { radarStretches } from '../lib/radars'
 import type { Radar, Section } from '../lib/radars'
 
 const props = defineProps<{
@@ -26,6 +27,7 @@ const layers = {
   avoided: L.layerGroup(),
   route: L.layerGroup(),
   sections: L.layerGroup(),
+  radarRoads: L.layerGroup(),
   radars: L.layerGroup(),
   stops: L.layerGroup(),
   ends: L.layerGroup(),
@@ -65,6 +67,12 @@ function drawSections() {
 
 function drawRadars() {
   layers.radars.clearLayers()
+  layers.radarRoads.clearLayers()
+  if (props.route) {
+    for (const l of radarStretches(props.route, props.radars)) {
+      L.polyline(l, { color: '#7b2cbf', weight: 5, interactive: false }).addTo(layers.radarRoads)
+    }
+  }
   for (const r of props.radars) {
     const kind = r.kind === 'isik' ? 'Kırmızı ışık kamerası' : r.kind === 'ortalama' ? 'Ortalama hız radarı' : 'Sabit radar'
     const limit = r.maxspeed ? ` · ${r.maxspeed} km/s` : ''
@@ -114,7 +122,7 @@ onMounted(() => {
 onBeforeUnmount(() => map?.remove())
 
 watch(() => props.avoided, drawAvoided)
-watch(() => props.radars, drawRadars)
+watch(() => [props.radars, props.route], drawRadars)
 watch(() => props.sections, drawSections)
 watch(() => props.route, () => drawRoute(true))
 watch(() => props.stops, drawStops, { deep: true })

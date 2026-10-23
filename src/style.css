@@ -109,6 +109,7 @@ input[type='text'] { width: 100%; font: inherit; color: var(--ink); background: 
 .lg.avoid { background: repeating-linear-gradient(90deg, var(--stop) 0 5px, transparent 5px 9px); }
 .lg.radar { width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 3px solid #d62828; box-sizing: border-box; }
 .lg.section { background: #f77f00; }
+.lg.radar-road { background: #7b2cbf; }
 .lg.pin { width: 12px; height: 12px; border-radius: 50%; background: var(--sign); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line); }
 
 .out { padding: 14px; }
