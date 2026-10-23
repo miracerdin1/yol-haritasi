@@ -34,7 +34,7 @@ export function routeKml(route: LatLng[], radars: Radar[], sections: Section[], 
     line('Rota', route, 'rota'),
     ...sections.map((s) => {
       const km = (s.length / 1000).toFixed(1).replace('.', ',')
-      return line(`Ortalama hız bölümü · ${km} km${s.maxspeed ? ` · ${s.maxspeed} km/s` : ''}`, s.line, 'bolum')
+      return line(`Ortalama hız bölümü${s.approx ? ' (yaklaşık)' : ''} · ${km} km${s.maxspeed ? ` · ${s.maxspeed} km/s` : ''}`, s.line, 'bolum')
     }),
     ...radarStretches(route, radars).map((l) => line('Radarlı yol', l, 'radarli')),
     ...radars.map((r) =>
