@@ -34,12 +34,48 @@ interface Member {
   geometry?: { lat: number; lon: number }[]
 }
 
-interface Node {
+export interface Node {
   type?: 'node' | 'relation'
   lat: number
   lon: number
   tags?: Record<string, string>
   members?: Member[]
+}
+
+/** `b`: "güney,batı,kuzey,doğu". Radar düğümleri ve ortalama hız ilişkileri. */
+export const radarQuery = (b: string) =>
+  `[out:json][timeout:60];(node["highway"="speed_camera"](${b});rel["type"="enforcement"]["enforcement"="average_speed"](${b}););out geom;`
+
+/** Siteyle gelen hazır radar verisi: derlemede `npm run prefetch` üretir. */
+export interface RadarFile {
+  generatedAt: number
+  nodes: Node[]
+}
+
+/** Sadece kullandığımız alanlar kalsın, dosya küçük olsun. */
+export function compactNode({ type, lat, lon, tags, members }: Node): Node {
+  const t: Record<string, string> = {}
+  if (tags?.maxspeed) t.maxspeed = tags.maxspeed
+  if (tags?.enforcement) t.enforcement = tags.enforcement
+  const n: Node = { type, lat, lon, tags: t }
+  if (members) n.members = members
+  return n
+}
+
+let embedded: Promise<Node[] | null> | null = null
+/** Siteyle gelen radar verisini bir kez indirir; yoksa (ör. dosyadan açıldıysa) null. */
+function loadEmbedded(): Promise<Node[] | null> {
+  embedded ??= (async () => {
+    try {
+      const res = await fetch(new URL('data/radars.json', document.baseURI))
+      if (!res.ok) return null
+      const f = (await res.json()) as RadarFile
+      return f.nodes?.length ? f.nodes : null
+    } catch {
+      return null
+    }
+  })()
+  return embedded
 }
 
 const TTL = 1000 * 60 * 60 * 24 * 30
@@ -64,7 +100,7 @@ async function loadNodes(b: string): Promise<Node[]> {
     if (i) await sleep(4000 * i)
     try {
       const j = await overpassFetch<{ elements: Node[] }>(
-        `[out:json][timeout:60];(node["highway"="speed_camera"](${b});rel["type"="enforcement"]["enforcement"="average_speed"](${b}););out geom;`,
+        radarQuery(b),
         { hedgeMs: 8000, timeoutMs: 60000 },
       )
       const n = j.elements.map(({ type, lat, lon, tags, members }) => ({ type, lat, lon, tags, members }))
@@ -90,7 +126,8 @@ export async function fetchRadars(line: LatLng[]): Promise<RadarData> {
   if (line.length < 2) return { radars: [], sections: [] }
   const box = bboxOf(line, 200)
   const b = `${box.s.toFixed(4)},${box.w.toFixed(4)},${box.n.toFixed(4)},${box.e.toFixed(4)}`
-  const nodes = await loadNodes(b)
+  // Radarlar sabit: önce siteyle gelen veri, yoksa (ya da eskiyse) Overpass'ten canlı
+  const nodes = (await loadEmbedded()) ?? (await loadNodes(b))
   const idx = new PointIndex(resample(line, 40))
   const radars: Radar[] = []
   const sections: Section[] = []

@@ -15,6 +15,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import {
   ENDPOINTS,
+  overpassFetch,
   PRESET_ROADS,
   fetchAnchors,
   overpass,
@@ -22,8 +23,13 @@ import {
 } from "../src/lib/roads";
 import type { Prebuilt } from "../src/lib/roads";
 import { fetchTollData } from "../src/lib/cost";
+import { compactNode, radarQuery } from "../src/lib/radars";
+import type { Node, RadarFile } from "../src/lib/radars";
 
 const FILE = "public/data/prebuilt.json";
+const RADAR_FILE = "public/data/radars.json";
+// Türkiye (kıyı şeridi dahil)
+const TURKEY = "35.8,25.6,42.2,44.9";
 // Tüm hazır yollar kapalıyken oluşan bölgeyi (+20 km) rahatça kapsayan kutu
 const ANCHOR_BOX = { s: 39.9, w: 26.0, n: 41.7, e: 31.3 };
 
@@ -134,6 +140,26 @@ async function main() {
     kept++;
     console.warn(
       `• Ücretli yollar: indirilemedi, ${out.tolls ? "repodaki veri kullanılıyor" : "masrafta köprüler hesaplanmayacak"}`,
+    );
+  }
+
+  try {
+    const j = await retry("Radarlar", () =>
+      overpassFetch<{ elements: Node[] }>(radarQuery(TURKEY), {
+        hedgeMs: 10000,
+        timeoutMs: 120000,
+      }),
+    );
+    const nodes = j.elements.map(compactNode);
+    if (nodes.length < 500) throw new Error("beklenenden az veri");
+    const f: RadarFile = { generatedAt: Date.now(), nodes };
+    mkdirSync("public/data", { recursive: true });
+    writeFileSync(RADAR_FILE, JSON.stringify(f));
+    console.log(`✓ Radarlar: ${nodes.length} nokta/bölüm`);
+  } catch {
+    kept++;
+    console.warn(
+      `• Radarlar: indirilemedi, ${existsSync(RADAR_FILE) ? "repodaki veri kullanılıyor" : "site canlı indirecek"}`,
     );
   }
 
