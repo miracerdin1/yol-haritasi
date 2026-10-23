@@ -1,6 +1,7 @@
 import { PointIndex, bboxOf, cumulative, resample } from './geo'
 import type { LatLng } from './geo'
 import { overpassFetch } from './roads'
+import { MANUAL_SECTIONS } from './manualSections'
 
 export interface Radar {
   p: LatLng
@@ -19,6 +20,8 @@ export interface Section {
   maxspeed?: number
   /** Bölüm uzunluğu (metre) */
   length: number
+  /** Uç noktaları kesin değil (elle eklenmiş) */
+  approx?: boolean
 }
 
 export interface RadarData {
@@ -150,6 +153,9 @@ export async function fetchRadars(line: LatLng[]): Promise<RadarData> {
       kind: enf === 'traffic_signals' ? 'isik' : enf === 'average_speed' ? 'ortalama' : 'hiz',
     })
   }
+  for (const m of MANUAL_SECTIONS) {
+    if (m.line.some((p) => idx.nearest(p, NEAR_M) <= NEAR_M)) sections.push(m)
+  }
   return { radars, sections }
 }
 
@@ -190,7 +196,7 @@ function sectionOf(members: Member[], maxspeed?: number): Section | null {
 }
 
 /** Radarın önünde ve arkasında rotanın bu kadarı (metre) "radarlı yol" sayılır. */
-const REACH_M = 300
+const REACH_M = 1000
 const STEP_M = 40
 
 /** Rotanın radarlı kesimleri; üst üste binenler birleştirilir. */

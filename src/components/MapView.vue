@@ -58,7 +58,7 @@ function drawSections() {
   layers.sections.clearLayers()
   for (const sec of props.sections) {
     const km = (sec.length / 1000).toFixed(1).replace('.', ',')
-    const tip = `Ortalama hız bölümü · ${km} km${sec.maxspeed ? ` · ${sec.maxspeed} km/s` : ''}`
+    const tip = `Ortalama hız bölümü${sec.approx ? ' (yaklaşık)' : ''} · ${km} km${sec.maxspeed ? ` · ${sec.maxspeed} km/s` : ''}`
     L.polyline(sec.line, { color: '#f77f00', weight: 8, opacity: 0.75, lineCap: 'butt' })
       .bindTooltip(tip, { sticky: true })
       .addTo(layers.sections)
@@ -70,7 +70,7 @@ function drawRadars() {
   layers.radarRoads.clearLayers()
   if (props.route) {
     for (const l of radarStretches(props.route, props.radars)) {
-      L.polyline(l, { color: '#7b2cbf', weight: 5, interactive: false }).addTo(layers.radarRoads)
+      L.polyline(l, { color: '#7b2cbf', weight: 6, interactive: false }).addTo(layers.radarRoads)
     }
   }
   for (const r of props.radars) {
