@@ -22,6 +22,7 @@ import { GOOGLE_MAX_WAYPOINTS, googleMapsUrl } from "./lib/google";
 import { yandexMapsUrl, yandexNaviUrl } from "./lib/yandex";
 import { load, save } from "./lib/storage";
 import { fetchRadars } from "./lib/radars";
+import { downloadKml, routeKml } from "./lib/kml";
 import type { Radar, Section } from "./lib/radars";
 import type { FuelType, TollResult } from "./lib/cost";
 import {
@@ -358,6 +359,13 @@ const ymapsUrl = computed(() =>
     ? yandexMapsUrl(yandexFrom.value, resolvedTo.value, stopPoints.value)
     : "",
 );
+
+function exportKml() {
+  if (!result.value) return;
+  downloadKml(
+    routeKml(result.value.line, radars.value, sections.value, stopPoints.value),
+  );
+}
 
 async function copyLink() {
   try {
@@ -785,6 +793,21 @@ const closedLabels = computed(() =>
           >Yandex Haritalar ↗</a
         >
       </div>
+      <div class="actions">
+        <button
+          type="button"
+          class="btn ghost"
+          :disabled="radarState === 'loading'"
+          @click="exportKml"
+        >
+          Radarlı haritayı indir (KML)
+        </button>
+      </div>
+      <p class="muted small">
+        KML dosyasını mymaps.google.com'da "Yeni harita → İçe aktar" ile
+        yükleyin; rota, radarlar ve ortalama hız bölümleri Google Maps
+        uygulamasında Kaydedilenler → Haritalar altında görünür.
+      </p>
       <p class="muted small">
         Navigasyonda açınca yol tarifinde O-7 ya da kapattığınız yol görünüyorsa
         "+ Durak ekle" ile o bölgedeki önerilen rotanın üstüne bir durak daha
