@@ -3,10 +3,13 @@ import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { LatLng } from '../lib/geo'
+import type { Radar, Section } from '../lib/radars'
 
 const props = defineProps<{
   route: LatLng[] | null
   avoided: LatLng[][]
+  radars: Radar[]
+  sections: Section[]
   stops: LatLng[]
   from: LatLng | null
   to: LatLng | null
@@ -22,6 +25,8 @@ let map: L.Map | null = null
 const layers = {
   avoided: L.layerGroup(),
   route: L.layerGroup(),
+  sections: L.layerGroup(),
+  radars: L.layerGroup(),
   stops: L.layerGroup(),
   ends: L.layerGroup(),
 }
@@ -45,6 +50,31 @@ function drawRoute(fit: boolean) {
   L.polyline(props.route, { color: '#fff', weight: 9, opacity: 0.9, interactive: false }).addTo(layers.route)
   L.polyline(props.route, { color: css('--sign'), weight: 5, interactive: false }).addTo(layers.route)
   if (fit && map) map.fitBounds(L.latLngBounds(props.route), { padding: [24, 24] })
+}
+
+function drawSections() {
+  layers.sections.clearLayers()
+  for (const sec of props.sections) {
+    const km = (sec.length / 1000).toFixed(1).replace('.', ',')
+    const tip = `Ortalama hız bölümü · ${km} km${sec.maxspeed ? ` · ${sec.maxspeed} km/s` : ''}`
+    L.polyline(sec.line, { color: '#f77f00', weight: 8, opacity: 0.75, lineCap: 'butt' })
+      .bindTooltip(tip, { sticky: true })
+      .addTo(layers.sections)
+  }
+}
+
+function drawRadars() {
+  layers.radars.clearLayers()
+  for (const r of props.radars) {
+    const kind = r.kind === 'isik' ? 'Kırmızı ışık kamerası' : r.kind === 'ortalama' ? 'Ortalama hız radarı' : 'Sabit radar'
+    const limit = r.maxspeed ? ` · ${r.maxspeed} km/s` : ''
+    const icon = L.divIcon({
+      className: 'radar-pin',
+      html: `<span>${r.maxspeed ?? '📷'}</span>`,
+      iconSize: [26, 26],
+    })
+    L.marker(r.p, { icon, title: kind + limit, zIndexOffset: -100 }).bindTooltip(kind + limit).addTo(layers.radars)
+  }
 }
 
 function drawStops() {
@@ -75,6 +105,8 @@ onMounted(() => {
   })
   drawAvoided()
   drawRoute(true)
+  drawSections()
+  drawRadars()
   drawStops()
   drawEnds()
 })
@@ -82,6 +114,8 @@ onMounted(() => {
 onBeforeUnmount(() => map?.remove())
 
 watch(() => props.avoided, drawAvoided)
+watch(() => props.radars, drawRadars)
+watch(() => props.sections, drawSections)
 watch(() => props.route, () => drawRoute(true))
 watch(() => props.stops, drawStops, { deep: true })
 watch(() => [props.from, props.to], drawEnds)
@@ -114,6 +148,16 @@ watch(() => [props.from, props.to], drawEnds)
   border-radius: 50%;
   font: 800 13px/1 var(--display);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+:deep(.radar-pin) {
+  display: grid;
+  place-items: center;
+  background: #fff;
+  color: #111;
+  border: 3px solid #d62828;
+  border-radius: 50%;
+  font: 800 10px/1 var(--display);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 :deep(.leaflet-container) {
   font-family: var(--body);
