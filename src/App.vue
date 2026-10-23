@@ -8,7 +8,7 @@ import type { Place } from "./lib/geocode";
 import { geocode } from "./lib/geocode";
 import type { RoadData, RoadDef } from "./lib/roads";
 import {
-  PRESET_ROADS,
+  ROAD_CATALOG,
   clearOfSideRoads,
   customRoad,
   loadAnchors,
@@ -53,7 +53,7 @@ function saveKey() {
 // ---------- Yollar ----------
 const customInputs = ref<string[]>(load("customRoads", []));
 const roads = computed<RoadDef[]>(() => [
-  ...PRESET_ROADS,
+  ...ROAD_CATALOG,
   ...customInputs.value.map(customRoad),
 ]);
 /** true = yol açık (kullanılabilir), false = kaçın */
@@ -86,6 +86,18 @@ function removeRoad(def: RoadDef) {
   delete allowed[def.id];
 }
 const isAllowed = (id: string) => allowed[id] !== false;
+const showPick = ref(false);
+const roadFilter = ref("");
+const norm = (t: string) => t.toLocaleLowerCase("tr").replace(/[\s-]/g, "");
+const filteredRoads = computed(() => {
+  const q = norm(roadFilter.value);
+  return q
+    ? roads.value.filter((r) =>
+        norm(`${r.tag} ${r.label} ${r.note}`).includes(q),
+      )
+    : roads.value;
+});
+const avoidedRoads = computed(() => roads.value.filter((r) => !isAllowed(r.id)));
 
 // ---------- Başlangıç / varış ----------
 const last = load("last", {
@@ -482,51 +494,90 @@ const closedLabels = computed(() =>
       </div>
 
       <div class="stack tight">
-        <span class="lbl">Pahalı yollar</span>
-        <div class="card list">
-          <label v-for="r in roads" :key="r.id" class="tog">
-            <em class="tag" :class="{ city: r.id === 'avrasya' }">{{
-              r.tag
-            }}</em>
-            <span class="txt">
-              <strong>{{ r.label }}</strong>
-              <small
-                >{{ r.note }} ·
-                <span :class="isAllowed(r.id) ? 'on' : 'off'">{{
-                  isAllowed(r.id) ? "AÇIK" : "KAPALI"
-                }}</span></small
-              >
-            </span>
+        <span class="lbl">Kaçınılacak ücretli yollar</span>
+        <div class="card pick">
+          <button
+            type="button"
+            class="pick-head"
+            :aria-expanded="showPick"
+            aria-controls="pick-body"
+            @click="showPick = !showPick"
+          >
+            <span>{{
+              avoidedRoads.length
+                ? `${avoidedRoads.length} yol seçili`
+                : "Yol seçmek için dokunun"
+            }}</span>
+            <span class="chev" aria-hidden="true">▾</span>
+          </button>
+          <ul v-if="avoidedRoads.length" class="chips" aria-label="Seçili yollar">
+            <li v-for="r in avoidedRoads" :key="r.id">
+              <span class="chip">
+                <em class="tag" :class="{ city: r.id === 'avrasya' }">{{
+                  r.tag
+                }}</em>
+                {{ r.label }}
+                <button
+                  type="button"
+                  class="x"
+                  @click="allowed[r.id] = true"
+                  :aria-label="r.label + ' seçimini kaldır'"
+                >
+                  ✕
+                </button>
+              </span>
+            </li>
+          </ul>
+          <div v-if="showPick" id="pick-body" class="pick-body">
             <input
-              type="checkbox"
-              :id="'t-' + r.id"
-              :checked="isAllowed(r.id)"
-              @change="
-                allowed[r.id] = ($event.target as HTMLInputElement).checked
-              "
+              v-model="roadFilter"
+              type="search"
+              class="pick-search"
+              placeholder="Ara: O-5, köprü, İzmir…"
+              aria-label="Yol ara"
             />
-            <i class="sw" aria-hidden="true"></i>
-            <button
-              v-if="r.custom"
-              type="button"
-              class="x"
-              @click.prevent="removeRoad(r)"
-              :aria-label="r.label + ' yolunu listeden çıkar'"
-            >
-              ✕
-            </button>
-          </label>
-          <div class="add">
-            <input
-              id="newroad"
-              v-model="newRoad"
-              type="text"
-              placeholder="Yol ekle: O-6 ya da tam adı"
-              @keydown.enter.prevent="addRoad"
-            />
-            <button type="button" class="btn ghost small" @click="addRoad">
-              Ekle
-            </button>
+            <div class="pick-list" role="group" aria-label="Ücretli yollar">
+              <label v-for="r in filteredRoads" :key="r.id" class="opt">
+                <input
+                  type="checkbox"
+                  :checked="!isAllowed(r.id)"
+                  @change="
+                    allowed[r.id] = !($event.target as HTMLInputElement).checked
+                  "
+                />
+                <em class="tag" :class="{ city: r.id === 'avrasya' }">{{
+                  r.tag
+                }}</em>
+                <span class="txt">
+                  <strong>{{ r.label }}</strong>
+                  <small>{{ r.note }}</small>
+                </span>
+                <button
+                  v-if="r.custom"
+                  type="button"
+                  class="x"
+                  @click.prevent="removeRoad(r)"
+                  :aria-label="r.label + ' yolunu listeden çıkar'"
+                >
+                  ✕
+                </button>
+              </label>
+              <p v-if="!filteredRoads.length" class="muted small pad">
+                Listede yok. Aşağıdan numarasıyla ya da adıyla ekleyin.
+              </p>
+            </div>
+            <div class="add">
+              <input
+                id="newroad"
+                v-model="newRoad"
+                type="text"
+                placeholder="Listede yok mu? O-6 ya da tam adı"
+                @keydown.enter.prevent="addRoad"
+              />
+              <button type="button" class="btn ghost small" @click="addRoad">
+                Ekle
+              </button>
+            </div>
           </div>
         </div>
       </div>

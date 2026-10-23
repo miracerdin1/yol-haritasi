@@ -61,6 +61,51 @@ export const PRESET_ROADS: RoadDef[] = [
   },
 ];
 
+/** Numarayla tanımlı otoyol: OSM'de "O-3", "O3" ya da "O-3;E-80" diye yazılmış olabilir. */
+function refRoad(num: string, label: string, note: string): RoadDef {
+  return {
+    id: `ref:O-${num}`,
+    label,
+    tag: `O-${num}`,
+    note,
+    query: `way["highway"="motorway"]["ref"~"(^|;)O-?${num}(;|$)"](35.8,25.6,42.2,44.9);`,
+    skipBridges: true,
+  };
+}
+
+function namedBridge(id: string, name: string, box: string, note: string): RoadDef {
+  return {
+    id,
+    label: name,
+    tag: "KÖPRÜ",
+    note,
+    query: `way["highway"]["name"="${name}"](${box});`,
+    skipBridges: false,
+  };
+}
+
+/**
+ * Listeden seçilebilen diğer ücretli yollar. Hazır veriye girmezler; seçilince Overpass'ten
+ * indirilir ve tarayıcıda saklanır.
+ */
+export const EXTRA_ROADS: RoadDef[] = [
+  namedBridge("15temmuz", "15 Temmuz Şehitler Köprüsü", "40.9,28.9,41.2,29.2", "Boğaz, Ortaköy – Beylerbeyi"),
+  namedBridge("fsm", "Fatih Sultan Mehmet Köprüsü", "40.9,28.9,41.3,29.3", "Boğaz, Hisarüstü – Kavacık"),
+  refRoad("3", "Avrupa Otoyolu (TEM)", "Mahmutbey – Edirne"),
+  refRoad("4", "Anadolu Otoyolu (TEM)", "Gebze – Ankara"),
+  refRoad("5", "İstanbul–İzmir Otoyolu", "Gebze – Bursa – İzmir, Osmangazi Köprüsü dahil"),
+  refRoad("6", "Malkara–Çanakkale Otoyolu", "Çanakkale Köprüsü bağlantısı"),
+  refRoad("21", "Ankara–Niğde–Mersin Otoyolu", "Ankara, Kırşehir bağlantısı, Pozantı, Tarsus"),
+  refRoad("31", "İzmir–Aydın–Denizli Otoyolu", "Ege, Denizli yönü"),
+  refRoad("32", "İzmir–Çeşme Otoyolu", "Seferihisar, Çeşme"),
+  refRoad("33", "Kuzey Ege Otoyolu", "Menemen – Aliağa – Çandarlı"),
+  refRoad("52", "Adana–Gaziantep–Şanlıurfa Otoyolu", "Güneydoğu"),
+  refRoad("53", "Ceyhan–İskenderun Otoyolu", "Hatay yönü"),
+];
+
+/** Seçim listesinde görünen tüm hazır yollar. */
+export const ROAD_CATALOG: RoadDef[] = [...PRESET_ROADS, ...EXTRA_ROADS];
+
 /** Kullanıcının eklediği yol: OSM "ref" (ör. O-6) ya da tam ad (ör. "Fatih Sultan Mehmet Köprüsü"). */
 export function customRoad(input: string): RoadDef {
   const v = input.trim();
