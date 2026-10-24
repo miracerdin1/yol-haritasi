@@ -16,7 +16,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import {
   ENDPOINTS,
   overpassFetch,
-  PRESET_ROADS,
+  ROAD_CATALOG,
   fetchAnchors,
   overpass,
   processWays,
@@ -30,8 +30,9 @@ const FILE = "public/data/prebuilt.json";
 const RADAR_FILE = "public/data/radars.json";
 // Türkiye (kıyı şeridi dahil)
 const TURKEY = "35.8,25.6,42.2,44.9";
-// Tüm hazır yollar kapalıyken oluşan bölgeyi (+20 km) rahatça kapsayan kutu
-const ANCHOR_BOX = { s: 39.9, w: 26.0, n: 41.7, e: 31.3 };
+// Marmara – Orta Karadeniz/İç Anadolu: rota bu kutunun dışına çıkarsa ara nokta adayları canlı Overpass'ten
+// istenir ve sunucular meşgulken hesaplama takılır.
+const ANCHOR_BOX = { s: 39.5, w: 26.0, n: 42.2, e: 36.5 };
 
 /** Ön hazırlığın toplam süresi (denemek için PREFETCH_BUDGET_MS ile kısaltılabilir). */
 const BUDGET_MS = Number(process.env.PREFETCH_BUDGET_MS) || 6 * 60_000;
@@ -96,7 +97,7 @@ async function main() {
   };
   let kept = 0;
 
-  for (const def of PRESET_ROADS) {
+  for (const def of ROAD_CATALOG) {
     try {
       const d = await retry(def.label, async () => {
         const r = processWays(def, await overpass(def.query));
