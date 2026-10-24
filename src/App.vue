@@ -52,9 +52,15 @@ function saveKey() {
 
 // ---------- Yollar ----------
 const customInputs = ref<string[]>(load("customRoads", []));
+const same = (a: string, b: string) =>
+  a.toLocaleLowerCase("tr").replace(/[\s-]/g, "") ===
+  b.toLocaleLowerCase("tr").replace(/[\s-]/g, "");
+/** Listede zaten olan bir yolun elle yazılmış hâli (ör. "O-7") */
+const catalogMatch = (v: string) =>
+  ROAD_CATALOG.find((r) => same(r.tag, v) || same(r.label, v));
 const roads = computed<RoadDef[]>(() => [
   ...ROAD_CATALOG,
-  ...customInputs.value.map(customRoad),
+  ...customInputs.value.filter((v) => !catalogMatch(v)).map(customRoad),
 ]);
 /** true = yol açık (kullanılabilir), false = kaçın */
 const allowed = reactive<Record<string, boolean>>(
@@ -70,6 +76,14 @@ const newRoad = ref("");
 function addRoad() {
   const v = newRoad.value.trim();
   if (!v) return;
+  const hit = catalogMatch(v);
+  if (hit) {
+    // Hazır verisi olan yol: yeniden Overpass'ten indirmek yerine listedekini seç
+    allowed[hit.id] = false;
+    showPick.value = true;
+    newRoad.value = "";
+    return;
+  }
   const def = customRoad(v);
   if (!roads.value.some((r) => r.id === def.id)) {
     customInputs.value = [...customInputs.value, v];
